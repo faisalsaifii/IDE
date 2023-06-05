@@ -1,46 +1,33 @@
-const express = require("express");
-const { spawn } = require("child_process");
+const express = require('express');
+const { exec } = require('child_process');
+const cors = require('cors');
+
 const app = express();
-const path = require("path");
+const port = 3001;
 
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-app.post("/api/execute", async (req, res) => {
-  const { code, language, input } = req.body;
+// Enable CORS for all routes
+app.use(cors());
 
-  let output = "";
-  let error = "";
-  const subprocess = spawn(language, ["-c", code]);
+app.post('/api/execute', (req, res) => {
+	const code = req.body.code;
 
-  if (input) {
-    subprocess.stdin.write(input);
-    subprocess.stdin.end();
-  }
-
-  subprocess.stdout.on("data", (data) => {
-    output += data.toString();
-  });
-
-  subprocess.stderr.on("data", (data) => {
-    error += data.toString();
-  });
-
-  subprocess.on("close", () => {
-    if (error) {
-      res.status(400).json({ error });
-    } else {
-      res.json({ output });
-    }
-  });
+	exec(`python -c "${code}"`, (error, stdout, stderr) => {
+		if (error) {
+			console.error(`Execution error: ${error}`);
+			res.status(500).json({ output: 'Execution error' });
+		} else {
+			console.log(`Output: ${stdout}`);
+			res.json({ output: stdout });
+		}
+	});
+});
+app.use('/', express.static(__dirname + '/'));
+app.get('/', (req, res) => {
+	res.send('<h1>Hi</h1>');
 });
 
-// Serve the React app
-app.use(express.static(path.join(__dirname, "client/build")));
-
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "client/build/index.html"));
+app.listen(port, () => {
+	console.log(`Server is running on port ${port}`);
 });
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server started on port ${PORT}`));
